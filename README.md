@@ -21,6 +21,6 @@ The code for controlling the T1 includes some delay() statements, which block th
 
 In BluetoothSerial.cpp change
 
-#define RX_QUEUE_SIZE 512
-to
+#define RX_QUEUE_SIZE 512<br>
+to<br>
 #define RX_QUEUE_SIZE 2046
