@@ -17,5 +17,10 @@ The code is based on the code from<br>
  Matthew Robinson (VK6MR) https://zensunni.org/blog/2011/01/19/arduino-elecraft-t1-interface/ 
  for controlling the T1 by means of an ardunio.<br>
 
-Need for improvement:<br>
-The code for controlling the T1 includes some delay() statements, which block the bluetooth communication for a while. This leads to error messages "esp_spp_cb(): RX Full! Discarding 22 bytes" within the PlatformIO console. Although it seems to have no impact to the correct function, it should be solved later on.<br>
+The code for controlling the T1 includes some delay() statements, which block the bluetooth communication for a while. This leads to error messages "esp_spp_cb(): RX Full! Discarding 22 bytes" within the PlatformIO console. To avoid those errors, one can change the rx buffer size in the BluetoothSerial library:
+
+In BluetoothSerial.cpp change
+
+#define RX_QUEUE_SIZE 512
+to
+#define RX_QUEUE_SIZE 2046
