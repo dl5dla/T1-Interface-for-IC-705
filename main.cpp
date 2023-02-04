@@ -139,7 +139,7 @@ void callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
 // ----------------------------------------
 void configRadioBaud(uint16_t  baudrate)
 {
-  if (!CAT.begin("IC-705-CAT")) //Bluetooth device name
+  if (!CAT.begin("T1-INTERFACE")) //Bluetooth device name
   {
     Serial.println("An error occurred initializing Bluetooth");
 
@@ -249,8 +249,10 @@ void sendCatRequest(uint8_t requestCode)
 #ifdef DEBUG
   Serial.print(">");
 #endif
+
   for (uint8_t i = 0; i < sizeof(req); i++) {
     CAT.write(req[i]);
+
 #ifdef DEBUG
     if (req[i] < 16)Serial.print("0");
     Serial.print(req[i], HEX);
@@ -321,9 +323,11 @@ void processCatMessages()
     bool knowncommand = true;
 
     if (readLine() > 0) {
+
       if (read_buffer[0] == START_BYTE && read_buffer[1] == START_BYTE) {
         if (read_buffer[3] == radio_address) {
           if (read_buffer[2] == BROADCAST_ADDRESS) {
+
             switch (read_buffer[4]) {
               case CMD_SET_FREQ:
                 printFrequency();
@@ -393,15 +397,29 @@ void sendBit(int bit) {
 // ----------------------------------------
 void sendBand(byte band) {
 
-  // Pull the TUNE_PIN line high for half a second
+  unsigned long previousTime = 0;
+  const long maxWaitTime = 50;
 
+  // Pull the TUNE_PIN line high for half a second
   digitalWrite(TUNE_PIN, HIGH);
   delay(500);
   digitalWrite(TUNE_PIN, LOW);
 
   // The ATU will pull the DATA_PIN line HIGH for 50ms
+
+  previousTime = millis();
   while(digitalRead(DATA_PIN) == LOW) {
+    // Measure time the while loop is active, and jump out after maxWaiTime.
+    // This esnures that the program does not lock in case the communication
+    // with the ATU is temporarly broken
+    
+    unsigned long currentTime = millis();
+    if (currentTime - previousTime > maxWaitTime) { 
+      Serial.println("Error: No positive pulse from T1 detected!");
+      return; 
+    }
   }
+  
   while(digitalRead(DATA_PIN) == HIGH) {
   }
   // Wait 10ms
@@ -432,7 +450,7 @@ void sendBand(byte band) {
 // ----------------------------------------
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   pinMode(DATA_PIN,INPUT);
   pinMode(TUNE_PIN, OUTPUT);
@@ -444,11 +462,11 @@ void setup()
       Serial.println("Radio not found");
 #endif
     } else {
-#ifdef DEBUG
+//#ifdef DEBUG
       Serial.print("Radio found at ");
       Serial.print(radio_address, HEX);
       Serial.println();
-#endif
+//#endif
     }
   }
 
@@ -465,13 +483,12 @@ void loop()
   byte band = getBand(frequency/1000);
 
   if( band != prev_band) {
-    sendBand(band);
     Serial.print("Frequency: ");
     Serial.print(frequency/1000);
     Serial.print(" -> band: ");
     Serial.println(band);
-
+    sendBand(band);
     prev_band=band;
   }
-
+  delay(1000);  // TEST
 }
