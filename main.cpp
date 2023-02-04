@@ -490,5 +490,5 @@ void loop()
     sendBand(band);
     prev_band=band;
   }
-  delay(1000);  // TEST
+  delay(50);  // TEST
 }
