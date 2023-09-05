@@ -24,13 +24,13 @@ I did the compilation of the code with PlatformIO, but it should be possible als
  <br><b>
 You have to replace the dummy bluetooth address in main.cpp with that of your IC-705.</b>
 <br><br>
-Depending on your country it might be required to adapt the frequency bands in main.c (starting from line 110).<br><br>
+Depending on your country it might be required to adapt the frequency bands in main.c (starting from line 110).<br>
 
 <b>Pairing</b>:<br>
 After flashing the code to the ESP32, the IC-705 and the ESP32 must be paired. In the bluetooth settings of the IC-705 select the menu item  "Pairing reception" and then immediately press the reset button at the ESP32 board. On the display of the IC-705 you should see now a message, which expects confirmation of a pass key. Press OK and the bluetooth connection shoud be established.
 <br><br>
 <s>After initial pairing of the ESP32 and ic-705, it is required to power-on the ESP32, before the ic-705 is switched on.</s>
-The new version sets the ESP32 as bluetooth master. Now in case the ESP32 or the TRX is temporarly switched off and on again, the TRX will be reconnected automatically.<br><br>
+The new version sets the ESP32 as bluetooth master. Now in case the ESP32 or the TRX is temporarly switched off and on again, the TRX will be reconnected automatically.<br>
 
 Optional:<br>
 The code for controlling the T1 includes some delay() statements, which block the bluetooth communication for a while. This leads to error messages "esp_spp_cb(): RX Full! Discarding 22 bytes" within the PlatformIO console. To avoid those errors, one can change the rx buffer size in the BluetoothSerial library:
