@@ -9,7 +9,9 @@ The transistor (npn, e.g. BC547 or similar) and the resistor is soldered directl
 ![Screenshot](pic2.png)
 ![Screenshot](pic3.png)
 <br><br>
-After initial pairing of the ESP32 and ic-705, it is required to power-on the ESP32, before the ic-705 is switched on.<br><br>
+<s>After initial pairing of the ESP32 and ic-705, it is required to power-on the ESP32, before the ic-705 is switched on.</s>
+The new version sets the ESP32 as bluetooth master. Now in case the ESP32 or the TRX is temporarly switched off and on again, the TRX will be reconnected automatically. <br><b>You have to change the bluetooth address of your TRX in main.cpp.</b>
+<br><br>
 The code is based on the code from<br>
  Ondrej Kolonicny (OK1CDJ) https://github.com/ok1cdj/IC705-BT-CIV 
  for controlling the ic-705 via bluetooth<br>
