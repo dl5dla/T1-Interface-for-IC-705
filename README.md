@@ -19,6 +19,11 @@ The code is based on the code from<br>
  Matthew Robinson (VK6MR) https://zensunni.org/blog/2011/01/19/arduino-elecraft-t1-interface/ 
  for controlling the T1 by means of an ardunio.<br>
 
+<b>Pairing</b>:<br>
+After flashing the code to the ESP32, the IC-705 and the ESP32 must be paired. In the bluetooth settings of the IC-705 select the menu item  "Pairing reception" and then immediately press the reset button at the ESP32 board. On the display of the IC-705 you should see now a message, which expects confirmation of a pass key. Press OK and the bluetooth connection shoud be established.
+<br><br>
+
+Optional:<br>
 The code for controlling the T1 includes some delay() statements, which block the bluetooth communication for a while. This leads to error messages "esp_spp_cb(): RX Full! Discarding 22 bytes" within the PlatformIO console. To avoid those errors, one can change the rx buffer size in the BluetoothSerial library:
 
 In BluetoothSerial.cpp change
