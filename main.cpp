@@ -27,15 +27,22 @@
       Many thanks to both for their example codes giving me the first insight on how
       to deal with the communication between the IC-705 and T1.
 
-      Need for improvement:
-      The code for controlling the T1 includes some delay() statements, which block the 
-      bluetooth communication for a while. This leads to error messages
-      "esp_spp_cb(): RX Full! Discarding 22 bytes" within the PlatformIO console.
-      Although it seems to have no impact to the correct function, it should be 
-      solved later on.
+      In this version the ESP32 device is set as bluetooth master and the IC-705 as client.
+      Due to this the bluetooth connection is more robust, and the IC-705 is reconnected
+      no matter if the TRX or the ESP32 is switched off temporarly.
+
+      It is important now to set the "bd_address" in the next lines!
 *************************************************************************/
 
+#include <Arduino.h>
 #include "BluetoothSerial.h"
+
+// ######################################################################
+// Enter the BD_ADDRESS of your IC-705. You can find it in the Bluetooth
+// settings in section 'Bluetooth Device Information'
+
+uint8_t bd_address[6]  = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35};
+// ######################################################################
 
 //#define DEBUG 1
 
@@ -119,17 +126,25 @@ const uint32_t bands[][2] =
 
 String modes;
 
-byte prev_band = -1;
+byte prev_band = 0xFF;
+boolean btConnected = false;
 
-BluetoothSerial CAT;
+BluetoothSerial SerialBT;
+
 
 // ------------------------------------------
 //   Callback to get info about connection
 // ------------------------------------------
-void callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) 
-{
-  if (event == ESP_SPP_SRV_OPEN_EVT) {
+void callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
+
+  if(event == ESP_SPP_SRV_OPEN_EVT){    // 34
+    btConnected = true;
     Serial.println("Client Connected");
+  }
+  else if (event == ESP_SPP_CLOSE_EVT)  // 27
+  {
+    btConnected = false;
+    Serial.println("Client disconnected");
   }
 
 }
@@ -139,15 +154,26 @@ void callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
 // ----------------------------------------
 void configRadioBaud(uint16_t  baudrate)
 {
-  if (!CAT.begin("T1-INTERFACE")) //Bluetooth device name
-  {
-    Serial.println("An error occurred initializing Bluetooth");
+  SerialBT.register_callback(callback);
 
+  // Setup bluetooth as master:
+  if(!SerialBT.begin("T1-INTERFACE",true)){
+    Serial.println("An error occurred initializing Bluetooth");
   } else {
-    CAT.register_callback(callback);
     Serial.println("Bluetooth initialized");
     Serial.println("The device started, now you can pair it with bluetooth!");
   }
+
+  // Connect to client:
+  Serial.print("Connect to bluetooth client ...");
+  
+  btConnected = SerialBT.connect(bd_address);
+
+  while (!btConnected) {
+    btConnected = SerialBT.connect(bd_address);
+    Serial.println( "Need Pairing" );
+  }
+  Serial.println( "Transceiver connected" );
 }
 
 // ----------------------------------------
@@ -161,11 +187,11 @@ uint8_t readLine(void)
 
   while (true)
   {
-    while (!CAT.available()) {
+    while (!SerialBT.available()) {
       if (--ed == 0)return 0;
     }
     ed = readtimeout;
-    byte = CAT.read();
+    byte = SerialBT.read();
     if (byte == 0xFF) continue; //TODO skip to start byte instead
 
     read_buffer[counter++] = byte;
@@ -196,6 +222,7 @@ bool searchRadio()
       }
       return true;
     }
+
   }
 
   radio_address = 0xFF;
@@ -205,16 +232,15 @@ bool searchRadio()
 // ----------------------------------------
 //    get band from frequency 
 // ----------------------------------------
-  uint8_t getBand(uint32_t freq)
+  byte getBand(uint32_t freq)
   {
-
     for(uint8_t i=0; i<NUM_OF_BANDS;i++) {
       if(freq >= bands[i][0] && freq <= bands[i][1] ) {
         if(i==12) return 12;  // T1 tuner does not have different settings for 2m and UHF 
         return i+1;
       }
     }
-    return -1;  // no band for considered frequency found
+    return 0xFF;  // no band for considered frequency found
       
   }
 
@@ -228,7 +254,7 @@ void radioSetMode(uint8_t modeid, uint8_t modewidth)
   Serial.print(">");
 #endif
   for (uint8_t i = 0; i < sizeof(req); i++) {
-    CAT.write(req[i]);
+    SerialBT.write(req[i]);
 #ifdef DEBUG
     if (req[i] < 16) Serial.print("0");
     Serial.print(req[i], HEX);
@@ -251,7 +277,7 @@ void sendCatRequest(uint8_t requestCode)
 #endif
 
   for (uint8_t i = 0; i < sizeof(req); i++) {
-    CAT.write(req[i]);
+    SerialBT.write(req[i]);
 
 #ifdef DEBUG
     if (req[i] < 16)Serial.print("0");
@@ -319,7 +345,7 @@ void processCatMessages()
     FD - stop byte
   */
 
-  while (CAT.available()) {
+  while (SerialBT.available()) {
     bool knowncommand = true;
 
     if (readLine() > 0) {
@@ -450,7 +476,7 @@ void sendBand(byte band) {
 // ----------------------------------------
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(DATA_PIN,INPUT);
   pinMode(TUNE_PIN, OUTPUT);
@@ -477,17 +503,20 @@ void setup()
 // ----------------------------------------
 void loop()
 {
+  if (btConnected == false)
+    btConnected = SerialBT.connect(bd_address);
+
   sendCatRequest(CMD_READ_FREQ);
   processCatMessages();
 
   byte band = getBand(frequency/1000);
 
-  if( band != prev_band) {
+  if( (band != prev_band) && (band != 0xFF) ) {
     Serial.print("Frequency: ");
     Serial.print(frequency/1000);
     Serial.print(" -> band: ");
     Serial.println(band);
-    sendBand(band);
+    //sendBand(band);
     prev_band=band;
   }
   delay(50);  // TEST
