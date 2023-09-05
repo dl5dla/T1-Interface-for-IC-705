@@ -516,7 +516,7 @@ void loop()
     Serial.print(frequency/1000);
     Serial.print(" -> band: ");
     Serial.println(band);
-    //sendBand(band);
+    sendBand(band);
     prev_band=band;
   }
   delay(50);  // TEST
