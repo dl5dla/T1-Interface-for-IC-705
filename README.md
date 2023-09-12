@@ -1,5 +1,5 @@
 # T1 interface for ICOM IC-705
-<b>Version 2.0 (12.09.2023)<b>
+<b>Version 2.0 (12.09.2023)</b>
 
 Update on 5.09.2023: The ESP32 behaves now as a bluetooth master, which makes the bluetooth binding between the IC-705 and the ESP32 more robust.<br>
 
