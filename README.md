@@ -1,7 +1,7 @@
 # T1 interface for ICOM IC-705
-Version 2.0 (12.09.2023)
+# Version 2.0 (12.09.2023)
 
-<b>Update on 5.09.2023:</b> The ESP32 behaves now as a bluetooth master, which makes the bluetooth binding between the IC-705 and the ESP32 more robust.<br>
+Update on 5.09.2023: The ESP32 behaves now as a bluetooth master, which makes the bluetooth binding between the IC-705 and the ESP32 more robust.<br>
 
 <b>Hardware:</b><br>
 As I am operating my IC-705 remotely by means of WFView (www.wfview.org), I was searching for an easy way to switch my Elecraft T1 tuner to the right settings when changing the frequency. The T1 stores its settings for each band which can be recalled via the control lines available on the jack socket of the T1.<br>
