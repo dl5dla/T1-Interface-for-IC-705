@@ -1,6 +1,8 @@
 /*************************************************************************
       T1 Interface
 
+      V2.0 (12.09.2023)
+
       Peter Jonas DL5DLA
 
       This code, running on an ESP32, requests the current frequency
@@ -41,41 +43,26 @@
 // Enter the BD_ADDRESS of your IC-705. You can find it in the Bluetooth
 // settings in section 'Bluetooth Device Information'
 
-uint8_t bd_address[6]  = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35};
+uint8_t bd_address[6]  = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 // ######################################################################
 
-//#define DEBUG 1
 
 #define DATA_PIN  18              // GPIO18 input/output
 #define TUNE_PIN  26              // GPIO26 (output)
 
-#define BROADCAST_ADDRESS    0x00 // Broadcast address
 #define CONTROLLER_ADDRESS   0xE0 //Controller address
 
 #define START_BYTE           0xFE // Start byte
 #define STOP_BYTE            0xFD // Stop byte
 
-#define CMD_SET_FREQ         0x00 // Set operating frequency data
-#define CMD_SET_MODE         0x01 // Set operating mode data
-
 #define CMD_READ_FREQ        0x03 // Read operating frequency data
-#define CMD_READ_MODE        0x04 // Read operating mode data
-
-#define CMD_WRITE_FREQ       0x05 // Write operating frequency data
-#define CMD_WRITE_MODE       0x06 // Write operating mode data
-
-#define IF_PASSBAND_WIDTH_WIDE     0x01
-#define IF_PASSBAND_WIDTH_MEDIUM   0x02
-#define IF_PASSBAND_WIDTH_NARROW   0x03
 
 // Function prototypes:
 void configRadioBaud(uint16_t);
 uint8_t readLine(void);
 bool searchRadio();
-void radioSetMode(uint8_t, uint8_t);
 void sendCatRequest(uint8_t);
 void printFrequency(void);
-void printMode(void);
 void processCatMessages();
 void sendBit(int);
 void sendBand(byte);
@@ -92,19 +79,6 @@ uint32_t  readtimeout;       //Serial port read timeout
 uint8_t   read_buffer[12];   //Read buffer
 uint32_t  frequency;         //Current frequency in Hz
 uint32_t  timer;
-
-const char* mode[] = {"LSB", "USB", "AM", "CW", "RTTY", "FM", "WFM",
-                       "CW-R","RTTY-R","","","","","","","","","","","","","","","DV"};
-#define MODE_TYPE_LSB     0x00
-#define MODE_TYPE_USB     0x01
-#define MODE_TYPE_AM      0x02
-#define MODE_TYPE_CW      0x03
-#define MODE_TYPE_RTTY    0x04
-#define MODE_TYPE_FM      0x05
-#define MODE_TYPE_WFM     0x06
-#define MODE_TYPE_CW_R    0x07
-#define MODE_TYPE_RTTY_R  0x08
-#define MODE_TYPE_DV      0x17
 
 #define NUM_OF_BANDS 13
 const uint32_t bands[][2] = 
@@ -152,12 +126,12 @@ void callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
 // ----------------------------------------
 //      Initialize bluetooth
 // ----------------------------------------
-void configRadioBaud(uint16_t  baudrate)
+void configRadioBaud(uint16_t baudrate)
 {
   SerialBT.register_callback(callback);
 
   // Setup bluetooth as master:
-  if(!SerialBT.begin("T1-INTERFACE",true)){
+  if(!SerialBT.begin("T1-INTERFACE",true)) {
     Serial.println("An error occurred initializing Bluetooth");
   } else {
     Serial.println("Bluetooth initialized");
@@ -183,12 +157,11 @@ uint8_t readLine(void)
 {
   uint8_t byte;
   uint8_t counter = 0;
-  uint32_t ed = readtimeout;
+  uint32_t ed = readtimeout;  // not initialized!
 
-  while (true)
-  {
+  while (btConnected) {
     while (!SerialBT.available()) {
-      if (--ed == 0)return 0;
+      if (--ed == 0 || !btConnected ) return 0; // leave the loop if BT connection is lost
     }
     ed = readtimeout;
     byte = SerialBT.read();
@@ -208,10 +181,6 @@ uint8_t readLine(void)
 bool searchRadio()
 {
   for (uint8_t baud = 0; baud < BAUD_RATES_SIZE; baud++) {
-#ifdef DEBUG
-    Serial.print("Try baudrate ");
-    Serial.println(baudRates[baud]);
-#endif
     configRadioBaud(baudRates[baud]);
     sendCatRequest(CMD_READ_FREQ);
 
@@ -244,27 +213,6 @@ bool searchRadio()
       
   }
 
-// ----------------------------------------
-//      Set mode
-// ----------------------------------------
-void radioSetMode(uint8_t modeid, uint8_t modewidth)
-{
-  uint8_t req[] = {START_BYTE, START_BYTE, radio_address, CONTROLLER_ADDRESS, CMD_WRITE_MODE, modeid, modewidth, STOP_BYTE};
-#ifdef DEBUG
-  Serial.print(">");
-#endif
-  for (uint8_t i = 0; i < sizeof(req); i++) {
-    SerialBT.write(req[i]);
-#ifdef DEBUG
-    if (req[i] < 16) Serial.print("0");
-    Serial.print(req[i], HEX);
-    Serial.print(" ");
-#endif
-  }
-#ifdef DEBUG
-  Serial.println();
-#endif
-}
 
 // ----------------------------------------
 //      Send CAT Request
@@ -272,23 +220,13 @@ void radioSetMode(uint8_t modeid, uint8_t modewidth)
 void sendCatRequest(uint8_t requestCode)
 {
   uint8_t req[] = {START_BYTE, START_BYTE, radio_address, CONTROLLER_ADDRESS, requestCode, STOP_BYTE};
-#ifdef DEBUG
-  Serial.print(">");
-#endif
 
   for (uint8_t i = 0; i < sizeof(req); i++) {
     SerialBT.write(req[i]);
-
-#ifdef DEBUG
-    if (req[i] < 16)Serial.print("0");
-    Serial.print(req[i], HEX);
-    Serial.print(" ");
-#endif
   }
-#ifdef DEBUG
-  Serial.println();
-#endif
+
 }
+
 
 // ----------------------------------------
 //      Print the received frequency
@@ -299,34 +237,13 @@ void printFrequency(void)
   //FE FE E0 42 03 <00 00 58 45 01> FD ic-820
   //FE FE 00 40 00 <00 60 06 14> FD ic-732
   for (uint8_t i = 0; i < 5; i++) {
-      if (read_buffer[9 - i] == 0xFD) continue; //spike
-  #ifdef DEBUG
-      if (read_buffer[9 - i] < 16)Serial.print("0");
-    Serial.print(read_buffer[9 - i], HEX);
-#endif
-
+    if (read_buffer[9 - i] == 0xFD) continue; //spike
     frequency += (read_buffer[9 - i] >> 4) * decMulti[i * 2];
     frequency += (read_buffer[9 - i] & 0x0F) * decMulti[i * 2 + 1];
   }
-#ifdef DEBUG
-  Serial.println();
-#endif
-}
-
-// ----------------------------------------
-//      Print the received mode
-// ----------------------------------------
-void printMode(void)
-{
-  //FE FE E0 42 04 <00 01> FD
-#ifdef DEBUG
-  Serial.print(read_buffer[5]);Serial.print("  ");
-  Serial.println(mode[read_buffer[5]]);
-#endif
-  modes = mode[read_buffer[5]];
-  //read_buffer[6] -> 01 - Wide, 02 - Medium, 03 - Narrow
 
 }
+
 
 // --------------------------------------------------
 //   Process the received messages from transceiver
@@ -352,51 +269,18 @@ void processCatMessages()
 
       if (read_buffer[0] == START_BYTE && read_buffer[1] == START_BYTE) {
         if (read_buffer[3] == radio_address) {
-          if (read_buffer[2] == BROADCAST_ADDRESS) {
-
-            switch (read_buffer[4]) {
-              case CMD_SET_FREQ:
-                printFrequency();
-                break;
-              case CMD_SET_MODE:
-                printMode();
-                break;
-              default:
-                knowncommand = false;
-            }
-          } else if (read_buffer[2] == CONTROLLER_ADDRESS) {
+         if (read_buffer[2] == CONTROLLER_ADDRESS) {
             switch (read_buffer[4]) {
               case CMD_READ_FREQ:
                 printFrequency();
-                break;
-              case CMD_READ_MODE:
-                printMode();
                 break;
               default:
                 knowncommand = false;
             }
           }
-        } else {
-#ifdef DEBUG
-          Serial.print(read_buffer[3]);
-          Serial.println(" also on-line?!");
-#endif
         }
       }
     }
-
-#ifdef DEBUG
-    //if(!knowncommand){
-    Serial.print("<");
-    for (uint8_t i = 0; i < sizeof(read_buffer); i++) {
-      if (read_buffer[i] < 16)Serial.print("0");
-      Serial.print(read_buffer[i], HEX);
-      Serial.print(" ");
-      if (read_buffer[i] == STOP_BYTE)break;
-    }
-    Serial.println();
-    //}
-#endif
   }
 
 }
@@ -484,15 +368,11 @@ void setup()
 
   while (radio_address == 0x00) {
     if (!searchRadio()) {
-#ifdef DEBUG
       Serial.println("Radio not found");
-#endif
     } else {
-//#ifdef DEBUG
       Serial.print("Radio found at ");
       Serial.print(radio_address, HEX);
       Serial.println();
-//#endif
     }
   }
 
@@ -503,8 +383,12 @@ void setup()
 // ----------------------------------------
 void loop()
 {
-  if (btConnected == false)
-    btConnected = SerialBT.connect(bd_address);
+  while (!btConnected) {
+      Serial.println( "Connecting ..." );
+      btConnected = SerialBT.connect(bd_address);
+      if(btConnected)
+          Serial.println( "Transceiver reconnected" );
+  }
 
   sendCatRequest(CMD_READ_FREQ);
   processCatMessages();
